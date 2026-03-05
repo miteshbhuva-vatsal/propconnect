@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --wp-green: #25D366;
+    --wp-green-dark: #128C7E;
+    --wp-teal: #075E54;
+    --wp-chat-bg: #ECE5DD;
+    --wp-sent: #D9FDD3;
+    --wp-border: #E9EDEF;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  /* Custom scrollbar — WhatsApp style */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+  }
+}
+
+@layer components {
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply bg-wp-green hover:bg-green-600 text-white font-semibold
+           px-6 py-3 rounded-xl transition-all duration-200
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-sm hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-wp-teal border border-wp-border font-semibold
+           px-6 py-3 rounded-xl transition-all duration-200
+           active:scale-95 disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-gray-100 text-wp-text-secondary font-medium
+           px-4 py-2 rounded-lg transition-all duration-150
+           active:scale-95;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold
+           px-6 py-3 rounded-xl transition-all duration-200 active:scale-95;
+  }
+
+  /* ── Input ── */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-wp-border
+           bg-white text-wp-text placeholder:text-wp-icon
+           focus:outline-none focus:border-wp-green focus:ring-2 focus:ring-wp-green/20
+           transition-all duration-200 text-sm;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-wp-text-secondary mb-1.5;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white rounded-2xl border border-wp-border shadow-sm;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-md hover:-translate-y-0.5
+           transition-all duration-200 cursor-pointer;
+  }
+
+  /* ── WhatsApp Header ── */
+  .wp-header {
+    @apply bg-wp-teal text-white px-4 py-3 flex items-center gap-3;
+  }
+
+  /* ── Chat Background ── */
+  .chat-bg {
+    background-color: #ECE5DD;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4c9ba' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* ── Message Bubbles ── */
+  .bubble-sent {
+    @apply bg-wp-sent text-wp-text rounded-2xl rounded-tr-sm
+           px-3 py-2 max-w-xs shadow-sm;
+  }
+
+  .bubble-received {
+    @apply bg-white text-wp-text rounded-2xl rounded-tl-sm
+           px-3 py-2 max-w-xs shadow-sm;
+  }
+
+  /* ── Badge ── */
+  .badge-verified {
+    @apply inline-flex items-center gap-1 text-xs font-medium
+           bg-wp-green/10 text-wp-green-dark px-2 py-0.5 rounded-full;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center gap-1 text-xs font-medium
+           bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-full;
+  }
+
+  .badge-rejected {
+    @apply inline-flex items-center gap-1 text-xs font-medium
+           bg-red-50 text-red-600 px-2 py-0.5 rounded-full;
+  }
+
+  /* ── Property Type Badge ── */
+  .tag {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  /* ── Section Header ── */
+  .section-header {
+    @apply text-lg font-semibold text-wp-text mb-4;
+  }
+
+  /* ── Bottom Nav ── */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-wp-border
+           flex items-center justify-around h-16 px-4 z-40
+           safe-area-inset-bottom;
+  }
+
+  .nav-tab {
+    @apply flex flex-col items-center gap-1 py-1 px-3 rounded-xl
+           transition-colors duration-150 min-w-[60px];
+  }
+
+  .nav-tab.active {
+    @apply text-wp-green;
+  }
+
+  .nav-tab:not(.active) {
+    @apply text-wp-icon;
+  }
+}
+
+@layer utilities {
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #075E54, #25D366);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
