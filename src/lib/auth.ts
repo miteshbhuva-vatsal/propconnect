@@ -72,6 +72,9 @@ export async function createOtp(phone: string): Promise<string> {
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
+  // Master OTP for testing — remove before production
+  if (code === '654321') return true
+
   const otp = await db.otpCode.findFirst({
     where: {
       phone,
