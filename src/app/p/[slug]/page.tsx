@@ -13,6 +13,7 @@ import { formatIndianPrice, PROPERTY_TYPE_LABELS, DEAL_TYPE_LABELS } from '@/lib
 import ListingGallery from './ListingGallery'
 import InquiryFlow from './InquiryFlow'
 import TrackingPixel from './TrackingPixel'
+import BackButton from './BackButton'
 
 type Props = { params: { slug: string }; searchParams: Record<string, string> }
 
@@ -163,8 +164,11 @@ export default async function PublicListingPage({ params, searchParams }: Props)
         <span className="text-gray-700 font-medium truncate max-w-[180px]">{listing.title}</span>
       </div>
 
-      {/* Photo Gallery */}
-      <ListingGallery images={allImages} title={listing.title} />
+      {/* Photo Gallery with back button */}
+      <div className="relative">
+        <BackButton />
+        <ListingGallery images={allImages} title={listing.title} />
+      </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-32">
         {/* Title block */}

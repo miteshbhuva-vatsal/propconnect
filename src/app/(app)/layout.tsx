@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Home, Search, MessageSquare, BarChart3, User, Plus, Bell } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Home, Search, MessageSquare, BarChart3, User, Plus, Bell, ArrowLeft } from 'lucide-react'
 import axios from 'axios'
 
 const NAV_ITEMS = [
@@ -16,7 +16,13 @@ const NAV_ITEMS = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [unreadCount, setUnreadCount] = useState(0)
+
+  // Determine if we should show a back button
+  // We show it if we're NOT on one of the main tab root pages
+  const isTabRoot = NAV_ITEMS.some(item => item.href === pathname)
+  const showBackButton = !isTabRoot && pathname !== '/'
 
   // Fetch unread notification count on mount + every 30s
   useEffect(() => {
@@ -67,6 +73,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Top bar */}
       <header className="sticky top-0 z-40 bg-wp-teal text-white px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {showBackButton && (
+            <button
+              onClick={() => router.back()}
+              className="p-1 -ml-1 hover:bg-white/10 rounded-full transition-colors flex items-center justify-center"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          )}
           <span className="font-bold text-base">PropConnect</span>
         </div>
         <div className="flex items-center gap-2">

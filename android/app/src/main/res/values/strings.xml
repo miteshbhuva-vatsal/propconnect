@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PropConnect</string>
+    <string name="title_activity_main">PropConnect</string>
+    <string name="package_name">com.propconnect.app</string>
+    <string name="custom_url_scheme">com.propconnect.app</string>
+</resources>
