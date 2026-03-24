@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
 
     const otp = await createOtp(phone)
 
-    // In production: send OTP via MSG91/Twilio
-    // For development, return OTP in response (remove in production!)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DEV] OTP for ${phone}: ${otp}`)
+    // Dev mode or no SMS keys configured → skip SMS, log OTP
+    const smsConfigured = !!process.env.MSG91_AUTH_KEY
+    if (process.env.NODE_ENV === 'development' || !smsConfigured) {
+      console.log(`[TEST] OTP for ${phone}: ${otp}`)
       return NextResponse.json(apiSuccess({ phone, devOtp: otp }, 'OTP sent'))
     }
 
