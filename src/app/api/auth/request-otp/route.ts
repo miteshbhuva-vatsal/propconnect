@@ -38,7 +38,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const otp = await createOtp(phone)
+    let otp: string
+    try {
+      otp = await createOtp(phone)
+    } catch (dbErr) {
+      console.error('[OTP] DB error creating OTP:', dbErr)
+      return NextResponse.json(apiError('Database error, please try again'), { status: 500 })
+    }
 
     // Dev mode or no SMS keys configured → skip SMS, log OTP
     const smsConfigured = !!process.env.MSG91_AUTH_KEY
@@ -47,12 +53,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiSuccess({ phone, devOtp: otp }, 'OTP sent'))
     }
 
-    // Send OTP via SMS provider
-    await sendSmsOtp(phone, otp)
+    try {
+      await sendSmsOtp(phone, otp)
+    } catch (smsErr) {
+      console.error('[OTP] SMS error:', smsErr)
+      return NextResponse.json(apiError('Failed to send SMS, please try again'), { status: 500 })
+    }
 
     return NextResponse.json(apiSuccess({ phone }, 'OTP sent successfully'))
   } catch (error) {
-    console.error('OTP request error:', error)
+    console.error('[OTP] Unexpected error:', error)
     return NextResponse.json(apiError('Failed to send OTP'), { status: 500 })
   }
 }
