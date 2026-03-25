@@ -58,23 +58,31 @@ export async function POST(request: NextRequest) {
 }
 
 async function sendSmsOtp(phone: string, otp: string) {
-  const provider = process.env.SMS_PROVIDER || 'msg91'
+  // Normalize to 91XXXXXXXXXX format
+  const mobile = phone.replace(/^\+/, '').replace(/^0+/, '')
+  const mobileWithCountry = mobile.startsWith('91') ? mobile : `91${mobile}`
 
-  if (provider === 'msg91') {
-    const url = 'https://api.msg91.com/api/v5/otp'
-    await fetch(url, {
-      method: 'POST',
-      headers: {
-        'authkey': process.env.MSG91_AUTH_KEY!,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        template_id: process.env.MSG91_TEMPLATE_ID,
-        mobile: phone.replace('+', ''),
-        authkey: process.env.MSG91_AUTH_KEY,
-        otp,
-      }),
-    })
+  const res = await fetch('https://api.msg91.com/api/v5/otp', {
+    method: 'POST',
+    headers: {
+      'authkey': process.env.MSG91_AUTH_KEY!,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      template_id: process.env.MSG91_TEMPLATE_ID,
+      mobile: mobileWithCountry,
+      authkey: process.env.MSG91_AUTH_KEY,
+      otp,
+      sender: process.env.MSG91_SENDER_ID || 'PRPCNT',
+    }),
+  })
+
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok || data.type === 'error') {
+    console.error('[MSG91] Failed to send OTP:', data)
+    throw new Error(data.message || 'MSG91 send failed')
   }
-  // Add Twilio support here if needed
+
+  console.log(`[MSG91] OTP sent to ${mobileWithCountry}`)
 }
