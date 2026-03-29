@@ -1,39 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Building2, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 import axios from 'axios'
-import type { ConfirmationResult } from 'firebase/auth'
-
-declare global {
-  interface Window {
-    recaptchaVerifier?: import('firebase/auth').RecaptchaVerifier
-    confirmationResult?: ConfirmationResult
-  }
-}
-
-const IS_PROD = process.env.NODE_ENV === 'production'
 
 export default function LoginPage() {
   const router = useRouter()
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
-  const recaptchaRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!IS_PROD || typeof window === 'undefined') return
-    // Only init Firebase reCAPTCHA in production
-    import('@/lib/firebase-client').then(({ auth, RecaptchaVerifier }) => {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-          callback: () => {},
-        })
-      }
-    })
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,45 +21,19 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      if (IS_PROD) {
-        // Production: use Firebase phone auth
-        const { auth, signInWithPhoneNumber } = await import('@/lib/firebase-client')
-        const fullPhone = `+91${digits.slice(-10)}`
-        const appVerifier = window.recaptchaVerifier!
-        const result = await signInWithPhoneNumber(auth, fullPhone, appVerifier)
-        window.confirmationResult = result
-        toast.success('OTP sent to your phone')
-        router.push(`/login/otp?phone=${encodeURIComponent(phone)}`)
-      } else {
-        // Development: use local OTP API (OTP shown in toast + server console)
-        const res = await axios.post('/api/auth/request-otp', { phone })
-        if (res.data.success) {
-          if (res.data.data?.devOtp) {
-            toast(`Dev OTP: ${res.data.data.devOtp}`, { icon: '🔑', duration: 15000 })
-          } else {
-            toast.success('OTP sent to your phone')
-          }
-          router.push(`/login/otp?phone=${encodeURIComponent(phone)}`)
+      const res = await axios.post('/api/auth/request-otp', { phone: digits.slice(-10) })
+      if (res.data.success) {
+        if (res.data.data?.devOtp) {
+          toast(`Dev OTP: ${res.data.data.devOtp}`, { icon: '🔑', duration: 15000 })
+        } else {
+          toast.success('OTP sent to your phone')
         }
+        router.push(`/login/otp?phone=${encodeURIComponent(digits.slice(-10))}`)
       }
     } catch (err: unknown) {
       console.error('OTP send error:', err)
-      const error = err as { code?: string; message?: string; response?: { data?: { error?: string } } }
-      if (error.code === 'auth/too-many-requests') {
-        toast.error('Too many attempts. Please try again later.')
-      } else if (error.code === 'auth/invalid-phone-number') {
-        toast.error('Invalid phone number')
-      } else if (error.code === 'auth/operation-not-allowed') {
-        toast.error('Phone auth not enabled in Firebase Console')
-      } else if (error.code === 'auth/unauthorized-domain') {
-        toast.error('Domain not authorized in Firebase Console')
-      } else {
-        toast.error(error.response?.data?.error || error.code || 'Failed to send OTP')
-      }
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear()
-        window.recaptchaVerifier = undefined
-      }
+      const error = err as { response?: { data?: { error?: string } } }
+      toast.error(error.response?.data?.error || 'Failed to send OTP')
     } finally {
       setLoading(false)
     }
@@ -127,8 +77,6 @@ export default function LoginPage() {
                   />
                 </div>
               </div>
-
-              <div id="recaptcha-container" ref={recaptchaRef} />
 
               <button
                 type="submit"

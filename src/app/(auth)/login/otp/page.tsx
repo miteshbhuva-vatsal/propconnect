@@ -5,15 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, ArrowLeft, Smartphone } from 'lucide-react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { auth, RecaptchaVerifier, signInWithPhoneNumber } from '@/lib/firebase-client'
-import type { ConfirmationResult } from 'firebase/auth'
-
-declare global {
-  interface Window {
-    recaptchaVerifier?: RecaptchaVerifier
-    confirmationResult?: ConfirmationResult
-  }
-}
 
 function OtpForm() {
   const router = useRouter()
@@ -40,44 +31,17 @@ function OtpForm() {
   const verifyOtp = async (code: string) => {
     setLoading(true)
     try {
-      if (process.env.NODE_ENV === 'production') {
-        // Production: verify via Firebase then exchange for JWT
-        const confirmationResult = window.confirmationResult
-        if (!confirmationResult) {
-          toast.error('Session expired. Please request a new OTP.')
-          router.replace('/login')
-          return
-        }
-        const firebaseResult = await confirmationResult.confirm(code)
-        const firebaseToken = await firebaseResult.user.getIdToken()
-        const res = await axios.post('/api/auth/verify-otp', { phone, firebaseToken })
-        if (res.data.success) {
-          const { isNewUser, accessToken } = res.data.data
-          localStorage.setItem('access_token', accessToken)
-          localStorage.setItem('user', JSON.stringify(res.data.data.user))
-          toast.success('Welcome to PropConnect!')
-          window.location.href = isNewUser ? '/onboarding' : '/feed'
-        }
-      } else {
-        // Development: verify via our OTP API (supports master OTP 654321)
-        const res = await axios.post('/api/auth/verify-otp', { phone, otp: code })
-        if (res.data.success) {
-          const { isNewUser, accessToken } = res.data.data
-          localStorage.setItem('access_token', accessToken)
-          localStorage.setItem('user', JSON.stringify(res.data.data.user))
-          toast.success('Welcome to PropConnect!')
-          window.location.href = isNewUser ? '/onboarding' : '/feed'
-        }
+      const res = await axios.post('/api/auth/verify-otp', { phone, otp: code })
+      if (res.data.success) {
+        const { isNewUser, accessToken } = res.data.data
+        localStorage.setItem('access_token', accessToken)
+        localStorage.setItem('user', JSON.stringify(res.data.data.user))
+        toast.success('Welcome to PropConnect!')
+        window.location.href = isNewUser ? '/onboarding' : '/feed'
       }
     } catch (err: unknown) {
-      const error = err as { code?: string; response?: { data?: { error?: string } } }
-      if (error.code === 'auth/invalid-verification-code') {
-        toast.error('Invalid OTP. Please try again.')
-      } else if (error.code === 'auth/code-expired') {
-        toast.error('OTP expired. Please request a new one.')
-      } else {
-        toast.error(error.response?.data?.error || 'Invalid OTP. Please try again.')
-      }
+      const error = err as { response?: { data?: { error?: string } } }
+      toast.error(error.response?.data?.error || 'Invalid OTP. Please try again.')
       setOtp(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
     } finally {
@@ -107,17 +71,7 @@ function OtpForm() {
     setOtp(['', '', '', '', '', ''])
     try {
       const digits = phone.replace(/\D/g, '')
-      const fullPhone = `+91${digits.slice(-10)}`
-
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-resend', {
-          size: 'invisible',
-          callback: () => {},
-        })
-      }
-
-      const result = await signInWithPhoneNumber(auth, fullPhone, window.recaptchaVerifier)
-      window.confirmationResult = result
+      await axios.post('/api/auth/request-otp', { phone: digits.slice(-10) })
       toast.success('OTP resent')
       setResendTimer(30)
       setTimeout(() => inputRefs.current[0]?.focus(), 100)
@@ -171,8 +125,6 @@ function OtpForm() {
             </div>
 
             {loading && <div className="text-center text-sm text-wp-text-secondary">Verifying...</div>}
-
-            <div id="recaptcha-resend" />
 
             <div className="text-center text-sm">
               {resendTimer > 0 ? (

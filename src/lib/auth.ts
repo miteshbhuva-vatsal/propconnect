@@ -56,7 +56,8 @@ export function generateOtp(): string {
 
 // Use Supabase REST API for OTP (bypasses Prisma pooler issues)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Support both key names (Vercel pulls it as PUBLISHABLE_DEFAULT_KEY)
+const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)!
 
 async function sbFetch(path: string, options: RequestInit = {}) {
   return fetch(`${supabaseUrl}/rest/v1${path}`, {

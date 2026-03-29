@@ -8,12 +8,10 @@ import {
 } from '@/lib/auth'
 import { normalizePhone, apiSuccess, apiError } from '@/lib/utils'
 import { db } from '@/lib/db'
-import { adminAuth } from '@/lib/firebase-admin'
 
 const schema = z.object({
   phone: z.string().min(10).max(15),
-  otp: z.string().length(6).optional(),
-  firebaseToken: z.string().optional(),
+  otp: z.string().length(6),
   deviceId: z.string().optional(),
   fcmToken: z.string().optional(),
   deviceType: z.enum(['ios', 'android', 'web']).optional(),
@@ -27,25 +25,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiError('Invalid request'), { status: 400 })
     }
 
-    const { otp, firebaseToken, deviceId, fcmToken, deviceType } = parsed.data
+    const { otp, deviceId, fcmToken, deviceType } = parsed.data
     const phone = normalizePhone(parsed.data.phone)
 
-    // Verify via Firebase token (production) or fallback OTP (dev/master)
-    let isValid = false
-    if (firebaseToken) {
-      try {
-        const decoded = await adminAuth.verifyIdToken(firebaseToken)
-        // Firebase phone numbers come as +91XXXXXXXXXX
-        const firebasePhone = decoded.phone_number || ''
-        const normalizedFirebase = normalizePhone(firebasePhone)
-        isValid = normalizedFirebase === phone || firebasePhone.endsWith(phone.replace(/^\+91/, ''))
-      } catch (e) {
-        console.error('[verify-otp] Firebase token error:', e)
-        isValid = false
-      }
-    } else if (otp) {
-      isValid = await verifyOtp(phone, otp)
-    }
+    const isValid = await verifyOtp(phone, otp)
 
     if (!isValid) {
       return NextResponse.json(
