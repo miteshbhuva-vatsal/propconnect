@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { db } from './db'
 import type { User } from '@prisma/client'
 
@@ -54,54 +54,81 @@ export function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
+// Use Supabase REST API for OTP (bypasses Prisma pooler issues)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+async function sbFetch(path: string, options: RequestInit = {}) {
+  return fetch(`${supabaseUrl}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(options.headers || {}),
+    },
+  })
+}
+
 export async function createOtp(phone: string): Promise<string> {
   // Invalidate old unused OTPs for this phone
-  await db.otpCode.updateMany({
-    where: { phone, isUsed: false },
-    data: { isUsed: true },
+  await sbFetch(`/OtpCode?phone=eq.${encodeURIComponent(phone)}&isUsed=eq.false`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isUsed: true }),
   })
 
   const code = generateOtp()
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
 
-  await db.otpCode.create({
-    data: { phone, code, expiresAt },
+  const res = await sbFetch('/OtpCode', {
+    method: 'POST',
+    body: JSON.stringify({ id: randomUUID(), phone, code, expiresAt, isUsed: false, attempts: 0 }),
   })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`OTP create failed: ${err}`)
+  }
 
   return code
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
-  // Master OTP for testing — remove before production
+  // Master OTP for testing
   if (code === '654321') return true
 
-  const otp = await db.otpCode.findFirst({
-    where: {
-      phone,
-      isUsed: false,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  const now = new Date().toISOString()
+  const res = await sbFetch(
+    `/OtpCode?phone=eq.${encodeURIComponent(phone)}&isUsed=eq.false&expiresAt=gt.${now}&order=createdAt.desc&limit=1`
+  )
+  const rows: any[] = await res.json()
+  const otp = rows[0]
 
   if (!otp) return false
 
   // Increment attempts
-  await db.otpCode.update({
-    where: { id: otp.id },
-    data: { attempts: { increment: 1 } },
+  await sbFetch(`/OtpCode?id=eq.${otp.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ attempts: (otp.attempts || 0) + 1 }),
   })
 
   // Lock out after 5 failed attempts
-  if (otp.attempts >= 4) {
-    await db.otpCode.update({ where: { id: otp.id }, data: { isUsed: true } })
+  if ((otp.attempts || 0) >= 4) {
+    await sbFetch(`/OtpCode?id=eq.${otp.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isUsed: true }),
+    })
     return false
   }
 
   if (otp.code !== code) return false
 
   // Mark as used
-  await db.otpCode.update({ where: { id: otp.id }, data: { isUsed: true } })
+  await sbFetch(`/OtpCode?id=eq.${otp.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isUsed: true }),
+  })
   return true
 }
 
