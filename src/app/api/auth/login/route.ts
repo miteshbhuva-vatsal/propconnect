@@ -2,18 +2,30 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-  generateAccessToken, generateRefreshToken,
-  storeRefreshToken, hashPhone,
-} from '@/lib/auth'
+import { randomUUID } from 'crypto'
+import { generateAccessToken, generateRefreshToken, hashPhone } from '@/lib/auth'
 import { normalizePhone, apiSuccess, apiError } from '@/lib/utils'
-import { db } from '@/lib/db'
+
+// Use Supabase REST API (same pattern as OTP — bypasses Prisma/DATABASE_URL)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)!
+
+async function sbFetch(path: string, options: RequestInit = {}) {
+  return fetch(`${supabaseUrl}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(options.headers || {}),
+    },
+  })
+}
 
 const schema = z.object({
   phone: z.string().min(10).max(15),
   deviceId: z.string().optional(),
-  fcmToken: z.string().optional(),
-  deviceType: z.enum(['ios', 'android', 'web']).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -24,41 +36,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(apiError('Invalid phone number'), { status: 400 })
     }
 
-    const { deviceId, fcmToken, deviceType } = parsed.data
+    const { deviceId } = parsed.data
     const phone = normalizePhone(parsed.data.phone)
     const phoneHash = hashPhone(phone)
+    const now = new Date().toISOString()
 
-    // Find or create user
-    let user = await db.user.findUnique({ where: { phoneHash } })
+    // Find user by phoneHash
+    const findRes = await sbFetch(`/User?phoneHash=eq.${encodeURIComponent(phoneHash)}&limit=1`)
+    const users: any[] = await findRes.json()
+    let user = users?.[0]
     const isNewUser = !user
 
     if (!user) {
-      user = await db.user.create({
-        data: {
+      // Create new user — provide all NOT NULL fields without DB defaults
+      const createRes = await sbFetch('/User', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: randomUUID(),
           phone,
           phoneHash,
           name: `User${phone.slice(-4)}`,
           dealCreditsLimit: 5,
-          subscription: {
-            create: {
-              plan: 'FREE',
-              dealCreditsTotal: 5,
-              planConfig: {
-                connectOrCreate: {
-                  where: { name: 'Free Plan' },
-                  create: {
-                    name: 'Free Plan',
-                    plan: 'FREE',
-                    price: 0,
-                    billingCycle: 'monthly',
-                    dealCredits: 5,
-                    features: ['Browse listings', '5 deal interactions'],
-                  },
-                },
-              },
-            },
-          },
-        },
+          referralCode: randomUUID().replace(/-/g, '').slice(0, 12),
+          updatedAt: now,
+          lastActiveAt: now,
+        }),
+      })
+      const created: any[] = await createRes.json()
+      user = Array.isArray(created) ? created[0] : created
+
+      if (!user?.id) {
+        console.error('[login] user create failed:', JSON.stringify(created))
+        return NextResponse.json(apiError('Failed to create account'), { status: 500 })
+      }
+    } else {
+      // Update lastActiveAt
+      await sbFetch(`/User?id=eq.${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ lastActiveAt: now, updatedAt: now }),
       })
     }
 
@@ -69,28 +84,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await db.user.update({
-      where: { id: user.id },
-      data: { lastActiveAt: new Date() },
-    })
-
-    if (deviceId) {
-      await db.device.upsert({
-        where: { userId_deviceId: { userId: user.id, deviceId } },
-        update: { fcmToken, deviceType: deviceType || 'web', lastSeenAt: new Date() },
-        create: {
-          userId: user.id,
-          deviceId,
-          fcmToken,
-          deviceType: deviceType || 'web',
-          userAgent: request.headers.get('user-agent') || undefined,
-        },
-      })
-    }
-
-    const accessToken = generateAccessToken(user)
+    const accessToken = generateAccessToken({ id: user.id, role: user.role })
     const refreshToken = generateRefreshToken(user.id)
-    await storeRefreshToken(user.id, refreshToken, deviceId)
+
+    // Store refresh token via REST
+    await sbFetch('/RefreshToken', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: randomUUID(),
+        userId: user.id,
+        token: refreshToken,
+        deviceId: deviceId || null,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        isRevoked: false,
+        createdAt: now,
+      }),
+    })
 
     const response = NextResponse.json(
       apiSuccess({
