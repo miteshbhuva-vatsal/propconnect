@@ -11,6 +11,7 @@ const PUBLIC_EXACT = ['/']
 const PUBLIC_PATHS = [
   '/login',
   '/onboarding',
+  '/api/auth/login',
   '/api/auth/request-otp',
   '/api/auth/verify-otp',
   '/api/auth/refresh',
