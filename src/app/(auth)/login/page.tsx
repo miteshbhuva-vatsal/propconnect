@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Building2, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,19 +19,17 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await axios.post('/api/auth/request-otp', { phone: digits.slice(-10) })
+      const res = await axios.post('/api/auth/login', { phone: digits.slice(-10) })
       if (res.data.success) {
-        if (res.data.data?.devOtp) {
-          toast(`Dev OTP: ${res.data.data.devOtp}`, { icon: '🔑', duration: 15000 })
-        } else {
-          toast.success('OTP sent to your phone')
-        }
-        router.push(`/login/otp?phone=${encodeURIComponent(digits.slice(-10))}`)
+        const { isNewUser, accessToken } = res.data.data
+        localStorage.setItem('access_token', accessToken)
+        localStorage.setItem('user', JSON.stringify(res.data.data.user))
+        toast.success('Welcome to PropConnect!')
+        window.location.href = isNewUser ? '/onboarding' : '/feed'
       }
     } catch (err: unknown) {
-      console.error('OTP send error:', err)
       const error = err as { response?: { data?: { error?: string } } }
-      toast.error(error.response?.data?.error || 'Failed to send OTP')
+      toast.error(error.response?.data?.error || 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -50,7 +46,7 @@ export default function LoginPage() {
             <span className="font-bold text-white text-lg">PropConnect</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-white/70 text-sm">Enter your phone number to continue</p>
+          <p className="text-white/70 text-sm">Enter your mobile number to get started</p>
         </div>
       </div>
 
@@ -89,9 +85,9 @@ export default function LoginPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                     </svg>
-                    Sending OTP...
+                    Logging in...
                   </span>
-                ) : 'Send OTP →'}
+                ) : 'Continue →'}
               </button>
 
               <div className="flex items-center gap-2 text-xs text-wp-text-secondary text-center justify-center">
